@@ -1,0 +1,221 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(uuid())
+  phone          String   @unique
+  countryCode    String   @default("+91")
+  name           String?
+  age            Int?
+  bio            String?
+  location       String?
+  avatarUrl      String?
+  avatarInitials String?
+  gender         String?
+  isOnline       Boolean  @default(false)
+  isVerified     Boolean  @default(false)
+  soulScore      Float    @default(5.0)
+  fcmToken       String?
+  lastSeen       DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  interests        UserInterest[]
+  sentMatches      Match[]         @relation("SentMatches")
+  receivedMatches  Match[]         @relation("ReceivedMatches")
+  sentMessages     Message[]       @relation("SentMessages")
+  notifications    Notification[]
+  roomMemberships  RoomMember[]
+  hostedRooms      Room[]          @relation("HostedRooms")
+  blockedBy        Block[]         @relation("BlockedBy")
+  blocking         Block[]         @relation("Blocking")
+  reportsMade      Report[]        @relation("ReportsMade")
+  reportsReceived  Report[]        @relation("ReportsReceived")
+  otpCodes         OtpCode[]
+  sessions         Session[]
+  callerCalls      Call[]          @relation("CallerCalls")
+  receiverCalls    Call[]          @relation("ReceiverCalls")
+  gameParticipants GameParticipant[]
+}
+
+model OtpCode {
+  id        String   @id @default(uuid())
+  userId    String
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Interest {
+  id    String         @id @default(uuid())
+  name  String         @unique
+  users UserInterest[]
+}
+
+model UserInterest {
+  userId     String
+  interestId String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interest   Interest @relation(fields: [interestId], references: [id], onDelete: Cascade)
+  @@id([userId, interestId])
+}
+
+model Match {
+  id         String   @id @default(uuid())
+  senderId   String
+  receiverId String
+  status     String   @default("PENDING")
+  matchScore Float    @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  sender       User          @relation("SentMatches",     fields: [senderId],   references: [id], onDelete: Cascade)
+  receiver     User          @relation("ReceivedMatches", fields: [receiverId], references: [id], onDelete: Cascade)
+  conversation Conversation?
+  @@unique([senderId, receiverId])
+}
+
+model Conversation {
+  id        String   @id @default(uuid())
+  matchId   String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  match     Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  messages  Message[]
+}
+
+model Message {
+  id             String   @id @default(uuid())
+  conversationId String
+  senderId       String
+  text           String?
+  mediaUrl       String?
+  mediaType      String?
+  status         String   @default("SENT")
+  createdAt      DateTime @default(now())
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+}
+
+model Room {
+  id         String   @id @default(uuid())
+  title      String
+  subtitle   String?
+  tags       String   @default("[]")
+  isLive     Boolean  @default(false)
+  isPrivate  Boolean  @default(false)
+  password   String?
+  maxMembers Int      @default(50)
+  hostId     String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  host     User          @relation("HostedRooms", fields: [hostId], references: [id], onDelete: Cascade)
+  members  RoomMember[]
+  messages RoomMessage[]
+}
+
+model RoomMember {
+  roomId   String
+  userId   String
+  role     String   @default("LISTENER")
+  joinedAt DateTime @default(now())
+  isMuted  Boolean  @default(false)
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@id([roomId, userId])
+}
+
+model RoomMessage {
+  id        String   @id @default(uuid())
+  roomId    String
+  senderId  String
+  text      String
+  createdAt DateTime @default(now())
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+}
+
+model Call {
+  id         String    @id @default(uuid())
+  callerId   String
+  receiverId String
+  channelId  String?
+  type       String    @default("VIDEO")
+  status     String    @default("INITIATED")
+  duration   Int?
+  startedAt  DateTime?
+  endedAt    DateTime?
+  createdAt  DateTime  @default(now())
+  caller   User @relation("CallerCalls",   fields: [callerId],   references: [id], onDelete: Cascade)
+  receiver User @relation("ReceiverCalls", fields: [receiverId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String
+  title     String
+  body      String
+  data      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Block {
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+  blocker User @relation("Blocking", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("BlockedBy", fields: [blockedId], references: [id], onDelete: Cascade)
+  @@id([blockerId, blockedId])
+}
+
+model Report {
+  id         String   @id @default(uuid())
+  reporterId String
+  reportedId String
+  reason     String
+  details    String?
+  status     String   @default("PENDING")
+  createdAt  DateTime @default(now())
+  reporter User @relation("ReportsMade",     fields: [reporterId], references: [id], onDelete: Cascade)
+  reported User @relation("ReportsReceived", fields: [reportedId], references: [id], onDelete: Cascade)
+}
+
+model Game {
+  id          String   @id @default(uuid())
+  type        String
+  status      String   @default("WAITING")
+  currentTurn String?
+  state       String   @default("{}")
+  winnerId    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  participants GameParticipant[]
+}
+
+model GameParticipant {
+  gameId   String
+  userId   String
+  score    Int      @default(0)
+  joinedAt DateTime @default(now())
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@id([gameId, userId])
+}
