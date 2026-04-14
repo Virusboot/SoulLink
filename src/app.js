@@ -70,6 +70,15 @@ app.use('/api/games',         gameRoutes);
 app.use('/api/upload',        uploadRoutes);
 app.use('/api/agora',         agoraRoutes);
 
+// Root route (important for Railway / browser)
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: '🚀 SoulLink Backend Live',
+    docs: '/api/health',
+  });
+});
+
 app.use('*', (req, res) => res.status(404).json({ success: false, message: `Not found: ${req.originalUrl}` }));
 app.use(errorHandler);
 
